@@ -223,6 +223,24 @@ class QuarkClient {
     }
   }
 
+  async waitForTransferCompletion(taskId) {
+    let result = { status: 0 };
+    while (result.status !== 2) {
+      try {
+        logger.info(`开始等待转存完成，任务ID: ${taskId}`);
+        result = await this.queryTask(taskId);
+        logger.info('转存完成查询成功');
+        if(result.status === 2) {
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        logger.error(`等待转存完成失败: ${error.message}`);
+        throw error;
+      }
+    }
+  }
+
   async getFids(filePaths) {
     const fids = [];
     let remainingPaths = [...filePaths];
@@ -320,6 +338,7 @@ class QuarkClient {
       // 分批转存，每批最多100个文件
       const batchSize = 100;
       const results = [];
+      const taskIds = [];
 
       for (let i = 0; i < fidList.length; i += batchSize) {
         const batchFids = fidList.slice(i, i + batchSize);
@@ -335,6 +354,7 @@ class QuarkClient {
           urlInfo.pwdId,
           stoken
         );
+        taskIds.push(taskId);
         
         // 查询转存状态
         const taskResult = await this.queryTask(taskId);
@@ -347,6 +367,8 @@ class QuarkClient {
         success: true,
         fileCount: fileList.length,
         results,
+        taskIds: taskIds,
+        taskId: taskIds[taskIds.length - 1], // 返回最后一个taskId
         files: fileList.map(file => ({
           name: file.file_name,
           size: file.size,
