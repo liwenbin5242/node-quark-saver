@@ -67,7 +67,7 @@ app.post('/api/transfer', async (req, res) => {
     
     logger.info('转存任务执行完成');
     logger.info(`成功转存 ${result.fileCount} 个文件`);
-    
+    const transferResult = await client.waitForTransferCompletion(result.taskId);
     // 生成分享链接
     logger.info('开始生成分享链接');
     const shareLinks = await client.createShareLinksForSavedFiles(result.files, path);

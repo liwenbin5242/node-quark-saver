@@ -399,20 +399,39 @@ class QuarkClient {
     }
   }
 
-  async createShareLink(fid, isPublic = true) {
+  async getShareInfo(shareId) {
+    const url = `${this.config.baseUrl}/1/clouddrive/share/password?pr=ucpro&fr=pc&uc_param_str=`;
+    const data = {
+      share_id: shareId
+    };
+    const headers = this.getHeaders();
+
+    try {
+      const response = await this.httpClient.post(url, data, headers);
+      if (response.code === 0 && response.data) {
+        return response.data;
+      }
+      throw new TransferError(`获取分享信息失败: ${response.message || '未知错误'}`);
+    } catch (error) {
+      if (error instanceof TransferError) {
+        throw error;
+      }
+      throw new TransferError(`获取分享信息失败: ${error.message}`);
+    }
+  }
+
+  async createShareLink(fid, title) {
     const url = `${this.config.baseUrl}/1/clouddrive/share`;
     const params = {
       pr: 'ucpro',
       fr: 'pc',
-      app: 'clouddrive',
-      __t: Date.now()
+      uc_param_str: ''
     };
     const data = {
       fid_list: [fid],
-      is_public: isPublic,
-      expire_time: 0,
-      passcode: '',
-      share_type: 1
+      expired_type: 1,
+      title,
+      url_type: 1
     };
     const headers = this.getHeaders();
 
@@ -429,20 +448,33 @@ class QuarkClient {
           logger.info('查询分享任务成功');
           
           if (taskResult && taskResult.share_id) {
+            const shareId = taskResult.share_id;
+            logger.info(`获取分享ID成功: ${shareId}`);
+            
+            // 通过share_id获取分享链接
+            const shareInfo = await this.getShareInfo(shareId);
+            logger.info('获取分享信息成功');
+            
             return {
-              url: `https://pan.quark.cn/s/${taskResult.share_id}`,
-              shareId: taskResult.share_id,
+              url: shareInfo.share_url || `https://pan.quark.cn/s/${shareId}`,
+              shareId: shareId,
               expireTime: taskResult.expire_time || 0
             };
           }
           throw new TransferError('创建分享链接失败: 未获取到share_id');
         } else if (response.data.share_id) {
-          // 如果直接返回了share_id，直接使用
-          const shareInfo = response.data;
+          // 如果直接返回了share_id，通过share_id获取分享链接
+          const shareId = response.data.share_id;
+          logger.info(`获取分享ID成功: ${shareId}`);
+          
+          // 通过share_id获取分享链接
+          const shareInfo = await this.getShareInfo(shareId);
+          logger.info('获取分享信息成功');
+          
           return {
-            url: `https://pan.quark.cn/s/${shareInfo.share_id}`,
-            shareId: shareInfo.share_id,
-            expireTime: shareInfo.expire_time || 0
+            url: shareInfo.share_url || `https://pan.quark.cn/s/${shareId}`,
+            shareId: shareId,
+            expireTime: response.data.expire_time || 0
           };
         }
         throw new TransferError('创建分享链接失败: 未获取到task_id或share_id');
@@ -469,7 +501,7 @@ class QuarkClient {
         const fids = await this.getFids([filePath]);
         if (fids.length > 0) {
           // 创建分享链接
-          const shareLink = await this.createShareLink(fids[0].fid, true);
+          const shareLink = await this.createShareLink(fids[0].fid, file.name);
           shareLinks.push({
             name: file.name,
             size: file.size,
