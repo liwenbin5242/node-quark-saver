@@ -73,6 +73,10 @@ app.post('/api/transfer', async (req, res) => {
 
     const savedFids = transferResult.save_as.save_as_top_fids;
     // 获取 最近转存文件列表根据fis找出对应文件
+    const recentFiles = await client.getRecentTransferredFiles();
+    result.files[0].name = recentFiles.find(recentFile => recentFile.fid === savedFids[0]).name;
+    result.files[0].fid = savedFids[0];
+    logger.info(`最近转存文件列表获取成功，共 ${recentFiles.length} 个文件`);
     
     // 生成分享链接
     logger.info('开始生成分享链接');
@@ -81,19 +85,8 @@ app.post('/api/transfer', async (req, res) => {
     
     // 构建响应数据
     const responseData = {
-      fileCount: result.fileCount,
-      files: result.files.map(file => {
-        const shareInfo = shareLinks.find(link => link.name === file.name);
-        return {
-          name: file.name,
-          size: file.size,
-          sizeFormatted: formatSize(file.size),
-          savePath: path,
-          shareUrl: shareInfo ? shareInfo.shareUrl : null
-        };
-      }),
-      shareLinks: shareLinks,
-      savePath: path
+      shareLink: shareLinks[0].shareUrl,
+      name: result.files[0].name,
     };
     
     return sendResponse(res, 200, true, responseData);

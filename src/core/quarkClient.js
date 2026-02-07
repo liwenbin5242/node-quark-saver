@@ -239,6 +239,7 @@ class QuarkClient {
         throw error;
       }
     }
+    return result;
   }
 
   async getFids(filePaths) {
@@ -429,7 +430,8 @@ class QuarkClient {
     const headers = this.getHeaders();
 
     try {
-      const response = await this.httpClient.post(url, data, headers);
+      const params = {};
+      const response = await this.httpClient.post(url, data, params, headers);
       if (response.code === 0 && response.data) {
         return response.data;
       }
@@ -514,28 +516,52 @@ class QuarkClient {
     try {
       // 获取保存路径的完整文件路径
       const shareLinks = [];
-      
-      for (const file of savedFiles) {
-        // 构建完整的文件路径
-        const filePath = savePath === '/' ? `/${file.name}` : `${savePath}/${file.name}`;
-        
-        // 获取文件的fid
-        const fids = await this.getFids([filePath]);
-        if (fids.length > 0) {
-          // 创建分享链接
-          const shareLink = await this.createShareLink(fids[0].fid, file.name);
-          shareLinks.push({
-            name: file.name,
-            size: file.size,
-            shareUrl: shareLink.url,
-            shareId: shareLink.shareId
-          });
-        }
-      }
+      const shareLink = await this.createShareLink(savedFiles[0].fid, savedFiles[0].name);
+      shareLinks.push({
+        name: savedFiles[0].name,
+        size: savedFiles[0].size,
+        shareUrl: shareLink.url,
+        shareId: shareLink.shareId
+      });
       
       return shareLinks;
     } catch (error) {
       logger.error(`生成分享链接失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async  getFilesByFids() {
+    try {
+      const url = `${this.config.baseUrl}/1/clouddrive/file/category?pr=ucpro&fr=pc&uc_param_str=&cat=&_page=1&_size=50&_fetch_total=1&_sort=updated_at:desc&source=save_as&labels=SAVE_AS_TOP_LAYER`;
+      const headers = this.getHeaders();
+      const params = {};
+      const response = await this.httpClient.get(url, params, headers);
+      if (response.code === 0 && response.data) {
+        return response.data.list.map(file => ({
+          name: file.file_name,
+          fid: file.fid,
+        }));
+      }
+      throw new TransferError(`获取文件信息失败: ${response.message || '未知错误'}`);
+    } catch (error) {
+      if (error instanceof TransferError) {
+        throw error;
+      }
+      throw new TransferError(`获取文件信息失败: ${error.message}`);
+    }
+  }
+
+  async getRecentTransferredFiles() {
+    try {
+      
+      // 根据fid列表获取文件信息
+      const files = await this.getFilesByFids();
+      logger.info(`获取文件信息成功，共 ${files.length} 个文件`);
+      
+      return files;
+    } catch (error) {
+      logger.error(`获取最近转存文件列表失败: ${error.message}`);
       throw error;
     }
   }
