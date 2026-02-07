@@ -72,7 +72,8 @@ app.post('/api/transfer', async (req, res) => {
     // 通过api获取转存结果的文件名称
 
     const savedFids = transferResult.save_as.save_as_top_fids;
-
+    // 获取 最近转存文件列表根据fis找出对应文件
+    
     // 生成分享链接
     logger.info('开始生成分享链接');
     const shareLinks = await client.createShareLinksForSavedFiles(result.files, path);
