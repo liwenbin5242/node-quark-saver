@@ -38,7 +38,7 @@ function sendResponse(res, statusCode, success, data, error = null) {
 app.post('/api/transfer', async (req, res) => {
   try {
     const { cookie,  url } = req.body;
-    const path = '/我的高考文件/志愿填报专属资料包'
+    const path = '/我的高考文件/志愿填报专属资料包';
     // 验证必填参数
     if (!cookie || !url) {
       return sendResponse(res, 400, false, null, '缺少必填参数: cookie和url');
