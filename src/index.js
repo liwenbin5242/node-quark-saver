@@ -37,7 +37,7 @@ function sendResponse(res, statusCode, success, data, error = null) {
 // 转存API接口
 app.post('/api/transfer', async (req, res) => {
   try {
-    const { cookie, path = '/', url } = req.body;
+    const { cookie, path = '/我的高考文件/志愿填报专属资料包', url } = req.body;
     
     // 验证必填参数
     if (!cookie || !url) {
