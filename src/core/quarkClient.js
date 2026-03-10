@@ -1,4 +1,5 @@
 const HTTPClient = require('../services/httpClient');
+const RedisClient = require('../services/redisClient');
 const URLParser = require('../utils/urlParser');
 const logger = require('../utils/logger');
 const { AuthenticationError, TransferError, FileNotFoundError } = require('../errors');
@@ -9,9 +10,11 @@ class QuarkClient {
     this.config = {
       baseUrl: config.baseUrl || 'https://drive-pc.quark.cn',
       baseUrlApp: config.baseUrlApp || 'https://drive-m.quark.cn',
-      userAgent: config.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/3.14.2 Chrome/112.0.5615.165 Electron/24.1.3.8 Safari/537.36 Channel/pckk_other_ch'
+      userAgent: config.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/3.14.2 Chrome/112.0.5615.165 Electron/24.1.3.8 Safari/537.36 Channel/pckk_other_ch',
+      redis: config.redis || {}
     };
     this.httpClient = new HTTPClient(config);
+    this.redisClient = new RedisClient(this.config.redis);
     this.mparam = this.extractMParam(cookie);
     this.isActive = false;
     this.nickname = '';
@@ -445,6 +448,16 @@ class QuarkClient {
   }
 
   async createShareLink(fid, title) {
+    // 生成缓存键
+    const cacheKey = this.redisClient.generateKey('share', fid);
+    
+    // 尝试从缓存获取
+    const cachedShareLink = await this.redisClient.get(cacheKey);
+    if (cachedShareLink) {
+      logger.info(`从缓存获取分享链接成功: ${cachedShareLink.url}`);
+      return cachedShareLink;
+    }
+    
     const url = `${this.config.baseUrl}/1/clouddrive/share`;
     const params = {
       pr: 'ucpro',
@@ -479,11 +492,17 @@ class QuarkClient {
             const shareInfo = await this.getShareInfo(shareId);
             logger.info('获取分享信息成功');
             
-            return {
+            const shareLink = {
               url: shareInfo.share_url || `https://pan.quark.cn/s/${shareId}`,
               shareId: shareId,
               expireTime: taskResult.expire_time || 0
             };
+            
+            // 缓存分享链接
+            await this.redisClient.set(cacheKey, shareLink);
+            logger.info('分享链接缓存成功');
+            
+            return shareLink;
           }
           throw new TransferError('创建分享链接失败: 未获取到share_id');
         } else if (response.data.share_id) {
@@ -495,11 +514,17 @@ class QuarkClient {
           const shareInfo = await this.getShareInfo(shareId);
           logger.info('获取分享信息成功');
           
-          return {
+          const shareLink = {
             url: shareInfo.share_url || `https://pan.quark.cn/s/${shareId}`,
             shareId: shareId,
             expireTime: response.data.expire_time || 0
           };
+          
+          // 缓存分享链接
+          await this.redisClient.set(cacheKey, shareLink);
+          logger.info('分享链接缓存成功');
+          
+          return shareLink;
         }
         throw new TransferError('创建分享链接失败: 未获取到task_id或share_id');
       }

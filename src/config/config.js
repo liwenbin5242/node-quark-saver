@@ -8,7 +8,13 @@ const DEFAULT_CONFIG = {
   retryCount: 3,
   maxConcurrentTasks: 5,
   defaultSavePath: '/',
-  logLevel: 'info'
+  logLevel: 'info',
+  redis: {
+    port: 16379,
+    host: '120.53.11.217',
+    password: 'ojmhygbgrfvcdewsxzasedrf',
+    ttl: 86400
+  }
 };
 
 class Config {
